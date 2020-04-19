@@ -1,0 +1,175 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Minecraft Overviewer Hosting
+
+
+Parameters:
+  DomainName:
+    Type: String
+    Default: ''
+  HostedZoneName:
+    Type: String
+    Default: ''
+
+
+Conditions:
+  CreateDomain: !Not [!Equals [!Ref DomainName, '']]
+  IsDefaultHostedZone: !Equals [ !Ref HostedZoneName, '' ]
+
+
+Resources:
+  ACMCertValidation:
+    Condition: CreateDomain
+    Type: AWS::Serverless::Application
+    Properties:
+      Location:
+        ApplicationId: arn:aws:serverlessrepo:us-east-1:498899591819:applications/acm-cert-validation
+        SemanticVersion: 0.0.8
+
+  DNSConfiguration:
+    Condition: CreateDomain
+    Type: Custom::DNSConfiguration
+    Properties:
+      ServiceToken: !GetAtt ACMCertValidation.Outputs.LambdaArn
+      DomainName: !Ref DomainName
+
+  SSLCertificate:
+    Condition: CreateDomain
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref DomainName
+      SubjectAlternativeNames:
+        - !Sub '*.${DomainName}'
+      ValidationMethod: DNS
+
+  RecordSet:
+    Condition: CreateDomain
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Comment: For DNS Validation
+      HostedZoneName: !If
+        - IsDefaultHostedZone
+        - !Sub ${DomainName}.
+        - !Sub ${HostedZoneName}.
+      Name: !GetAtt DNSConfiguration.Name
+      Type: !GetAtt DNSConfiguration.Type
+      ResourceRecords:
+        - !GetAtt DNSConfiguration.Value
+      TTL: 0
+
+  SiteBucket:
+    Type: AWS::S3::Bucket
+
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Statement:
+          - Action: s3:Get*
+            Effect: Allow
+            Resource: !Sub ${SiteBucket.Arn}/*
+            Principal:
+              CanonicalUser: !GetAtt OriginAccessIdentity.S3CanonicalUserId
+
+  OriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: static-frontend-oai
+
+  SiteDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Aliases: !If
+          - CreateDomain
+          - - !Sub ${DomainName}
+            - !Sub www.${DomainName}
+          - !Ref AWS::NoValue
+        DefaultRootObject: /index.html
+        Origins:
+          - Id: !GetAtt SiteBucket.DomainName
+            DomainName: !GetAtt SiteBucket.DomainName
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub origin-access-identity/cloudfront/${OriginAccessIdentity}
+        DefaultCacheBehavior:
+          TargetOriginId: !GetAtt  SiteBucket.DomainName
+          ForwardedValues:
+            QueryString: False
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: redirect-to-https
+          MinTTL: 0
+          MaxTTL: 31536000
+          DefaultTTL: 86400
+          AllowedMethods:
+            - HEAD
+            - GET
+            - OPTIONS
+          CachedMethods:
+            - HEAD
+            - GET
+          SmoothStreaming: False
+          Compress: True
+          FieldLevelEncryptionId: ''
+        PriceClass: PriceClass_All
+        Enabled: True
+        ViewerCertificate: !If
+          - CreateDomain
+          - AcmCertificateArn: !Ref SSLCertificate
+            SslSupportMethod: sni-only
+            MinimumProtocolVersion: TLSv1.1_2016
+          - !Ref AWS::NoValue
+        CustomErrorResponses:
+          - ErrorCachingMinTTL: 300
+            ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCachingMinTTL: 300
+            ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+        HttpVersion: http2
+        IPV6Enabled: True
+
+  SiteRecord:
+    Condition: CreateDomain
+    Type: AWS::Route53::RecordSetGroup
+    Properties:
+      HostedZoneName: !If
+        - IsDefaultHostedZone
+        - !Sub ${DomainName}.
+        - !Sub ${HostedZoneName}.
+      RecordSets:
+        - Name: !Sub ${DomainName}.
+          Type: A
+          AliasTarget:
+            DNSName: !GetAtt SiteDistribution.DomainName
+            HostedZoneId: Z2FDTNDATAQYW2
+        - Name: !Sub www.${DomainName}.
+          Type: A
+          AliasTarget:
+            DNSName: !GetAtt SiteDistribution.DomainName
+            HostedZoneId: Z2FDTNDATAQYW2
+
+  SSMSiteBucket:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Type: String
+      Description: Minecraft overviewer site bucket
+      Name: /minecraft-overviewer/site-bucket
+      Value: !Ref SiteBucket
+  SSMCloudFrontDomain:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Type: String
+      Description: Minecraft overviewer cloudfront domain name
+      Name: /minecraft-overviewer/cloudfront-domain
+      Value: !GetAtt SiteDistribution.DomainName
+
+
+Outputs:
+  SiteBucketName:
+    Description: S3 bucket containing site assets
+    Value: !Ref SiteBucket
