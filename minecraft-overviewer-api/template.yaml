@@ -1,0 +1,139 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: API to manage rendering Minecraft overviewer maps
+
+
+Parameters:
+  DomainName:
+    Type: String
+  HostedZoneName:
+    Type: String
+
+
+Globals:
+  Function:
+    Timeout: 3
+    Environment:
+      Variables:
+        JOBS_TABLE: !Ref Jobs
+  Api:
+    Domain:
+      CertificateArn: !Ref SSLCertificate
+      DomainName: !Ref DomainName
+      Route53:
+        HostedZoneName: !Sub ${HostedZoneName}.
+    Cors:
+      AllowMethods: "'*'"
+      AllowHeaders: "'*'"
+      AllowOrigin: "'*'"
+    GatewayResponses:
+      DEFAULT_4xx:
+        ResponseParameters:
+          Headers:
+            Access-Control-Allow-Headers: "'*'"
+            Access-Control-Allow-Origin: "'*'"
+            Access-Control-Allow-Methods: "'*'"
+      DEFAULT_5xx:
+        ResponseParameters:
+          Headers:
+            Access-Control-Allow-Headers: "'*'"
+            Access-Control-Allow-Origin: "'*'"
+            Access-Control-Allow-Methods: "'*'"
+
+
+Resources:
+  ACMCertValidation:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location:
+        ApplicationId: arn:aws:serverlessrepo:us-east-1:498899591819:applications/acm-cert-validation
+        SemanticVersion: 0.0.8
+
+  DNSConfiguration:
+    Type: Custom::DNSConfiguration
+    Properties:
+      ServiceToken: !GetAtt ACMCertValidation.Outputs.LambdaArn
+      DomainName: !Ref DomainName
+
+  SSLCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref DomainName
+      SubjectAlternativeNames:
+        - !Sub '*.${DomainName}'
+      ValidationMethod: DNS
+
+  RecordSet:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Comment: For DNS Validation
+      HostedZoneName: !Sub ${HostedZoneName}.
+      Name: !GetAtt DNSConfiguration.Name
+      Type: !GetAtt DNSConfiguration.Type
+      ResourceRecords:
+        - !GetAtt DNSConfiguration.Value
+      TTL: 0
+
+  Jobs:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: minecraft-overviewer-jobs
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+        - AttributeName: createdAt
+          KeyType: RANGE
+
+  CreateJob:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.create_job
+      Runtime: python3.8
+      Events:
+        HelloWorld:
+          Type: Api
+          Properties:
+            Path: /jobs
+            Method: post
+      Policies:
+        DynamoDBCrudPolicy:
+          TableName: !Ref Jobs
+
+  ListJobs:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.list_jobs
+      Runtime: python3.8
+      Events:
+        HelloWorld:
+          Type: Api
+          Properties:
+            Path: /jobs
+            Method: get
+      Policies:
+        DynamoDBCrudPolicy:
+          TableName: !Ref Jobs
+
+  UpdateJob:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.update_job
+      Runtime: python3.8
+      Events:
+        HelloWorld:
+          Type: Api
+          Properties:
+            Path: /jobs/{createdAt}
+            Method: put
+      Policies:
+        DynamoDBCrudPolicy:
+          TableName: !Ref Jobs

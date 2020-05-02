@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- load MUI -->
+    <link href="//cdn.muicss.com/mui-0.10.2/css/mui.min.css" rel="stylesheet" type="text/css" />
+    <script src="//cdn.muicss.com/mui-0.10.2/js/mui.min.js"></script>
+  </head>
+  <body>
+    <div class="mui-appbar">
+      <table width="100%">
+        <tr style="vertical-align: middle;">
+          <td class="mui--appbar-height">
+            <div class="mui--text-headline">{title}</div>
+          </td>
+          <td class="mui--appbar-height">
+            <div class="mui--text-headline">{time}</div>
+          </td>
+          <td class="mui--appbar-height" align="right">
+            <button class="mui-btn">Render Map</button>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <div style="width: 100%;">
+      <progress id="map-progress" style="width: 100%; background-color: green" value="40" max="100" />
+    </div>
+    <div>
+    </div>
+  </body>
+</html>

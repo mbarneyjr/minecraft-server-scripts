@@ -1,4 +1,5 @@
 worlds['world'] = '~/.minecraft/server/world'
+customwebassets = '~/.minecraft/server/minecraft-overviewer-admin'
 
 renders['overworld-day'] = {
     'world': 'world',
