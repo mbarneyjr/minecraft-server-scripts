@@ -1,6 +1,17 @@
 <!doctype html>
 <html>
   <head>
+    <title>Minecraft Overviewer</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta name="generator" content="Minecraft-Overviewer 0.15.30 (8f7e079)" />
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+    <script type="text/javascript" src="overviewerConfig.js"></script>
+    <script type="text/javascript" src="overviewer.js"></script>
+    <script type="text/javascript" src="baseMarkers.js"></script>
+    <script type="text/javascript" src="progress.js"></script>
+    <link rel="stylesheet" href="leaflet.css" />
+    <script src="leaflet.js"></script>
+    <link rel="stylesheet" href="overviewer.css" type="text/css" />
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,26 +19,29 @@
     <link href="//cdn.muicss.com/mui-0.10.2/css/mui.min.css" rel="stylesheet" type="text/css" />
     <script src="//cdn.muicss.com/mui-0.10.2/js/mui.min.js"></script>
   </head>
-  <body>
-    <div class="mui-appbar">
+  <body onload="overviewer.util.initialize()">
+    <noscript style="color:white; background-color:black">
+      If you can see this message, there is likely a problem loading the Overviewer JavaScript components.
+      Check the JavaScript console for error messages.
+    </noscript>
+    <div class="mui-appbar" style="background-color: #333333">
       <table width="100%">
         <tr style="vertical-align: middle;">
           <td class="mui--appbar-height">
-            <div class="mui--text-headline">{title}</div>
+            <div class="mui--text-menu">{title}</div>
           </td>
           <td class="mui--appbar-height">
-            <div class="mui--text-headline">{time}</div>
+            <div class="mui--text-menu">{time}</div>
           </td>
           <td class="mui--appbar-height" align="right">
-            <button class="mui-btn">Render Map</button>
+            <button class="mui-btn mui-btn--primary" onclick="requestMap()">Render Map</button>
           </td>
         </tr>
       </table>
+      <div style="width: 100%;">
+        <progress hidden="true" id="map-progress" style="width: 100%;" />
+      </div>
     </div>
-    <div style="width: 100%;">
-      <progress id="map-progress" style="width: 100%; background-color: green" value="40" max="100" />
-    </div>
-    <div>
-    </div>
+    <div id="mcmap"></div>
   </body>
 </html>
